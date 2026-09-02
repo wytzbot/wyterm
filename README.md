@@ -52,3 +52,20 @@ The current starter still needs the actual Linux userspace/runtime before it bec
 ## Phone-first development
 
 Open/import the project in a Gradle-capable Android IDE on your phone. Google Play Billing testing requires a Play-configured app and license/test track setup; Google documents that license testers can test billing without normal charges.
+
+
+## Build directly on Android with Termux
+
+See `README-TERMUX.md`.
+
+Quick build:
+
+```bash
+gradle assembleDebug --no-daemon
+```
+
+Output:
+
+`app/build/outputs/apk/debug/app-debug.apk`
+
+The project does not require GitHub Actions. WyDev can be used to edit the repository from your phone, while Termux performs the local Gradle build.

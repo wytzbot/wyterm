@@ -1,9 +1,12 @@
 package com.wyte.wyterm
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.os.Bundle
 import android.graphics.Color
 import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
 import android.widget.*
 import com.android.billingclient.api.*
 import java.io.BufferedReader
@@ -13,6 +16,7 @@ class MainActivity : Activity() {
     companion object { private const val PRO_PRODUCT_ID = "wyterm_pro" }
 
     private lateinit var output: TextView
+    private lateinit var outputScroll: ScrollView
     private lateinit var input: EditText
     private lateinit var billingClient: BillingClient
     private var proOwned = false
@@ -39,9 +43,11 @@ class MainActivity : Activity() {
 
         output = TextView(this).apply {
             textSize = 14f; setTextColor(Color.LTGRAY); typeface = android.graphics.Typeface.MONOSPACE
-            setPadding(4, 8, 4, 8); setTextIsSelectable(true); isVerticalScrollBarEnabled = true
+            setPadding(4, 8, 4, 8); setTextIsSelectable(true)
         }
-        root.addView(output, LinearLayout.LayoutParams(-1, 0, 1f))
+        outputScroll = ScrollView(this)
+        outputScroll.addView(output, ViewGroup.LayoutParams(-1, -2))
+        root.addView(outputScroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
         val shortcuts = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         listOf("CTRL","TAB","ESC","↑","↓","/","~","&&").forEach { key ->
@@ -69,7 +75,9 @@ class MainActivity : Activity() {
                     processPurchases(purchases)
                 }
             }
-            .enablePendingPurchases()
+            .enablePendingPurchases(
+                PendingPurchasesParams.newBuilder().enableOneTimeProducts().build()
+            )
             .build()
         billingClient.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(result: BillingResult) {
@@ -93,8 +101,8 @@ class MainActivity : Activity() {
         purchases.filter { it.products.contains(PRO_PRODUCT_ID) && !it.isAcknowledged && it.purchaseState == Purchase.PurchaseState.PURCHASED }
             .forEach { purchase ->
                 billingClient.acknowledgePurchase(
-                    AcknowledgePurchaseParams.newBuilder().setPurchaseToken(purchase.purchaseToken).build(), null
-                )
+                    AcknowledgePurchaseParams.newBuilder().setPurchaseToken(purchase.purchaseToken).build()
+                ) { /* acknowledged */ }
             }
         if (owned) printLine("\nWyTerm Pro active. Premium features unlocked.\n$ ")
     }
@@ -115,7 +123,8 @@ class MainActivity : Activity() {
             QueryProductDetailsParams.newBuilder().setProductList(
                 listOf(QueryProductDetailsParams.Product.newBuilder().setProductId(PRO_PRODUCT_ID).setProductType(BillingClient.ProductType.INAPP).build())
             ).build()
-        ) { result, details ->
+        ) { result, queryResult ->
+            val details = queryResult.productDetailsList
             if (result.responseCode != BillingClient.BillingResponseCode.OK || details.isEmpty()) {
                 Toast.makeText(this, "Pro product is not available yet. Configure wyterm_pro in Play Console.", Toast.LENGTH_LONG).show()
                 return@queryProductDetailsAsync
@@ -153,7 +162,10 @@ class MainActivity : Activity() {
         }.start()
     }
 
-    private fun printLine(text: String) { output.append(text); output.post { output.scrollTo(0, output.layout?.getLineTop(output.layout.lineCount) ?: 0) } }
+    private fun printLine(text: String) {
+        output.append(text)
+        outputScroll.post { outputScroll.fullScroll(View.FOCUS_DOWN) }
+    }
 
     override fun onResume() { super.onResume(); if (::billingClient.isInitialized && billingClient.isReady) restorePurchases() }
     override fun onDestroy() { if (::billingClient.isInitialized) billingClient.endConnection(); super.onDestroy() }
